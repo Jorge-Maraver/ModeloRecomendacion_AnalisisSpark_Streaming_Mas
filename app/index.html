@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gráfica en tiempo real</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 1.5rem; background: #f7f7f7; }
+    .card { background: #fff; border-radius: 10px; padding: 1.5rem; box-shadow: 0 8px 20px rgba(0,0,0,0.08); max-width: 800px; }
+    h2 { margin-top: 0; }
+    #status { margin-bottom: 1rem; color: #444; }
+    svg { width: 100%; height: 320px; background: #fafafa; border: 1px solid #ddd; border-radius: 8px; }
+    .axis text { fill: #666; font-size: 10px; }
+    .axis path, .axis line { stroke: #aaa; stroke-width: 1; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Datos de Kafka → Spark → Web</h2>
+    <div id="status">Esperando datos...</div>
+    <svg id="chart"></svg>
+    <p>Sirviendo desde <code>app/data/data.json</code> (actualizado por Spark).</p>
+  </div>
+
+  <script>
+    const svg = document.getElementById('chart');
+    const statusEl = document.getElementById('status');
+    const width = () => svg.clientWidth;
+    const height = 320;
+
+    function render(points) {
+      svg.innerHTML = '';
+      if (!points.length) {
+        statusEl.textContent = 'Sin datos aún';
+        return;
+      }
+      statusEl.textContent = `Puntos: ${points.length}`;
+      const xs = points.map(p => p.ts);
+      const ys = points.map(p => p.value);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const pad = 30;
+      const sx = x => pad + (x - minX) / ((maxX - minX) || 1) * (width() - 2*pad);
+      const sy = y => height - pad - (y - minY) / ((maxY - minY) || 1) * (height - 2*pad);
+
+      // Líneas
+      const pathData = points.map((p,i) => `${i?'L':'M'}${sx(p.ts)},${sy(p.value)}`).join(' ');
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d', pathData);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke','#0077ff');
+      path.setAttribute('stroke-width','2');
+      svg.appendChild(path);
+
+      // Puntos
+      points.forEach(p => {
+        const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        c.setAttribute('cx', sx(p.ts));
+        c.setAttribute('cy', sy(p.value));
+        c.setAttribute('r', 3);
+        c.setAttribute('fill', '#ff6600');
+        svg.appendChild(c);
+      });
+    }
+
+    async function tick() {
+      try {
+        const res = await fetch('data/data.json?cache=' + Date.now());
+        if (!res.ok) throw new Error(res.statusText);
+        const json = await res.json();
+        render(json.points || []);
+      } catch(err) {
+        statusEl.textContent = 'Esperando datos...';
+      } finally {
+        setTimeout(tick, 1000);
+      }
+    }
+    tick();
+  </script>
+</body>
+</html>

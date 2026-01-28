@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Feedback de usuario</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f7f7f7; margin: 1.5rem; }
+    .card { background: #fff; border-radius: 10px; padding: 1.5rem; box-shadow: 0 6px 16px rgba(0,0,0,0.08); max-width: 640px; }
+    h2 { margin-top: 0; }
+    label { display:block; margin-top: .7rem; font-weight: bold; }
+    select, input[type=number] { width: 100%; padding: .4rem; margin-top: .2rem; }
+    .movies { margin-top: 1rem; }
+    .movie { margin-bottom: .5rem; }
+    button { margin-top: 1rem; padding: .6rem 1rem; border: none; border-radius: 6px; background:#0077ff; color: #fff; cursor:pointer; }
+    button:hover { background:#005fcb; }
+    #status { margin-top: .5rem; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Enviar feedback</h2>
+    <label>Sexo</label>
+    <select id="gender">
+      <option value="Hombre">Hombre</option>
+      <option value="Mujer">Mujer</option>
+    </select>
+
+    <label>Profesión</label>
+    <select id="occupation"></select>
+
+    <label>Edad</label>
+    <input id="age" type="number" min="1" max="120" value="30" />
+
+    <div class="movies">
+      <label>Puntuación (1-5) a 5 películas</label>
+      <div id="movies"></div>
+    </div>
+
+    <button id="send">Enviar y recomendar</button>
+    <div id="status">Listo</div>
+    <h3>Recomendaciones (top 5)</h3>
+    <ul id="results"></ul>
+  </div>
+
+  <script>
+    const occupations = [
+      'Otro / No especificado','Académico / Educador','Artista','Administrativo / Oficina','Estudiante universitario / Postgrado',
+      'Atención al cliente','Médico / Sector salud','Ejecutivo / Gerente','Agricultor','Amo/a de casa','Estudiante (Escuela/Instituto)',
+      'Abogado','Programador','Jubilado','Ventas / Marketing','Científico','Autónomo','Técnico / Ingeniero','Artesano / Oficio manual',
+      'Desempleado','Escritor'
+    ];
+    const movies = [
+      {id: 260, name: 'Star Wars: Episodio IV - Una nueva esperanza'},
+      {id: 2858, name: 'American Beauty'},
+      {id: 1617, name: 'L.A. Confidential'},
+      {id: 1097, name: 'E.T., el extraterrestre'},
+      {id: 1, name: 'Toy Story'}
+    ];
+    const occSel = document.getElementById('occupation');
+    occupations.forEach(o=>{ const opt=document.createElement('option'); opt.value=o; opt.textContent=o; occSel.appendChild(opt); });
+    const moviesDiv = document.getElementById('movies');
+    movies.forEach(m=>{
+      const wrap=document.createElement('div'); wrap.className='movie';
+      wrap.innerHTML = `${m.name} (id ${m.id}): <input type="number" min="1" max="5" value="3" data-id="${m.id}"/>`;
+      moviesDiv.appendChild(wrap);
+    });
+
+    async function send() {
+      const gender = document.getElementById('gender').value;
+      const occupation = document.getElementById('occupation').value;
+      const age = parseInt(document.getElementById('age').value, 10) || null;
+      const ratings = Array.from(document.querySelectorAll('[data-id]')).map(inp=>({
+        filmId: parseInt(inp.dataset.id,10),
+        rating: parseInt(inp.value,10)
+      }));
+      const payload = { gender, occupation, age, ratings };
+      const status = document.getElementById('status');
+      const results = document.getElementById('results');
+      status.textContent = 'Enviando y recomendando...';
+      try {
+        const res = await fetch('/submit', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+        if (!res.ok) throw new Error(await res.text());
+        const json = await res.json();
+        results.innerHTML = '';
+        (json.recommendations || []).forEach(rec => {
+          const li = document.createElement('li');
+          li.textContent = `${rec.title || ('Película ' + rec.filmId)} (id ${rec.filmId}) -> score ${rec.score.toFixed(3)}`;
+          results.appendChild(li);
+        });
+        status.textContent = 'Listo ✅';
+      } catch(err) {
+        status.textContent = 'Error: ' + err;
+      }
+    }
+    document.getElementById('send').addEventListener('click', send);
+  </script>
+</body>
+</html>

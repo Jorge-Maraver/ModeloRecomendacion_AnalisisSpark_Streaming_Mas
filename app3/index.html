@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Feedback</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f5f5f5; margin: 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+    .card { background: #fff; border-radius: 10px; padding: 1rem; box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+    h3 { margin-top: 0; }
+    .bar { background: #0077ff; height: 20px; margin: 4px 0; color: #fff; padding-left: 6px; border-radius: 4px; line-height: 20px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h2>Feedback desde Kafka (Spark Streaming)</h2>
+  <div id="status">Esperando datos...</div>
+  <div class="grid">
+    <div class="card"><h3>Género</h3><svg id="gender" width="100%" height="240"></svg></div>
+    <div class="card"><h3>Edad</h3><svg id="age" width="100%" height="240"></svg></div>
+    <div class="card"><h3>Profesión</h3><svg id="occupation" width="100%" height="320"></svg></div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const renderBars = (svgId, data) => {
+      const svg = document.getElementById(svgId);
+      const w = svg.clientWidth || 300;
+      const h = svg.getAttribute('height') ? parseInt(svg.getAttribute('height'),10) : 240;
+      svg.innerHTML = '';
+      const entries = Object.entries(data || {}).sort((a,b)=>b[1]-a[1]);
+      if (!entries.length) {
+        const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+        text.setAttribute('x', 10);
+        text.setAttribute('y', 20);
+        text.textContent = 'Sin datos';
+        svg.appendChild(text);
+        return;
+      }
+      const max = Math.max(...entries.map(e=>e[1]));
+      const barH = Math.max(18, Math.floor((h-20)/entries.length) - 4);
+      entries.forEach(([k,v], i)=>{
+        const y = 10 + i*(barH+6);
+        const barW = Math.max(20, (v/max)*(w-120));
+        const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        rect.setAttribute('x', 100);
+        rect.setAttribute('y', y);
+        rect.setAttribute('width', barW);
+        rect.setAttribute('height', barH);
+        rect.setAttribute('fill', '#0077ff');
+        svg.appendChild(rect);
+        const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+        label.setAttribute('x', 5);
+        label.setAttribute('y', y + barH/2 + 5);
+        label.textContent = k;
+        label.setAttribute('font-size', '11');
+        svg.appendChild(label);
+        const value = document.createElementNS('http://www.w3.org/2000/svg','text');
+        value.setAttribute('x', 100 + barW + 6);
+        value.setAttribute('y', y + barH/2 + 5);
+        value.textContent = v;
+        value.setAttribute('font-size', '11');
+        value.setAttribute('fill', '#333');
+        svg.appendChild(value);
+      });
+    };
+
+    async function tick(){
+      try {
+        const res = await fetch('/counts?cache=' + Date.now());
+        if (!res.ok) throw new Error(res.statusText);
+        const json = await res.json();
+        statusEl.textContent = 'Actualizado';
+        renderBars('gender', json.gender || {});
+        renderBars('age', json.age || {});
+        renderBars('occupation', json.occupation || {});
+      } catch(err) {
+        statusEl.textContent = 'Esperando datos...';
+      } finally {
+        setTimeout(tick, 1000);
+      }
+    }
+    tick();
+  </script>
+</body>
+</html>

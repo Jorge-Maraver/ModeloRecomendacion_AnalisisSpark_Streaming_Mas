@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recomendaciones (ALS)</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f5f5f5; margin: 1.5rem; }
+    .card { background:#fff; border-radius:10px; padding:1rem; box-shadow:0 6px 16px rgba(0,0,0,0.08); max-width: 640px; }
+    h2 { margin-top:0; }
+    label { display:block; margin-top:.7rem; font-weight:bold; }
+    input[type=number] { width: 100%; padding:.4rem; margin-top:.2rem; }
+    .movies { margin-top:1rem; }
+    .movie { margin-bottom:.5rem; }
+    button { margin-top:1rem; padding:.6rem 1rem; border:none; border-radius:6px; background:#0077ff; color:#fff; cursor:pointer; }
+    button:hover { background:#005fcb; }
+    #status { margin-top:.5rem; font-weight:bold; }
+    ul { padding-left: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Solicitar recomendaciones</h2>
+    <p>Introduce 5 valoraciones (1-5) para generar las top 5 recomendaciones.</p>
+    <div class="movies" id="movies"></div>
+    <button id="send">Recomendar</button>
+    <div id="status">Listo</div>
+    <h3>Recomendaciones</h3>
+    <ul id="results"></ul>
+  </div>
+
+  <script>
+    const movies = [1,2,3,4,5];
+    const moviesDiv = document.getElementById('movies');
+    movies.forEach(id=>{
+      const wrap=document.createElement('div'); wrap.className='movie';
+      wrap.innerHTML = `Película ${id}: <input type="number" min="1" max="5" value="3" data-id="${id}"/>`;
+      moviesDiv.appendChild(wrap);
+    });
+
+    async function send(){
+      const ratings = Array.from(document.querySelectorAll('[data-id]')).map(inp=>({
+        filmId: parseInt(inp.dataset.id,10),
+        rating: parseInt(inp.value,10)
+      }));
+      const status = document.getElementById('status');
+      const results = document.getElementById('results');
+      status.textContent = 'Calculando...';
+      try {
+        const res = await fetch('/recommend', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ratings}) });
+        if (!res.ok) throw new Error(await res.text());
+        const json = await res.json();
+        results.innerHTML='';
+        (json.recommendations || []).forEach(rec=>{
+          const li=document.createElement('li');
+          li.textContent = `${rec.title || 'Película ' + rec.filmId} (id ${rec.filmId}) -> score ${rec.score.toFixed(3)}`;
+          results.appendChild(li);
+        });
+        status.textContent = 'Listo';
+      } catch(err){
+        status.textContent = 'Error: ' + err;
+      }
+    }
+    document.getElementById('send').addEventListener('click', send);
+  </script>
+</body>
+</html>

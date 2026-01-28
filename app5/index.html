@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panel de Bots Kafka</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f5f5f5; margin: 1.5rem; }
+    .card { background:#fff; border-radius:10px; padding:1rem; box-shadow:0 6px 16px rgba(0,0,0,0.08); max-width: 700px; }
+    h2 { margin-top:0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .5rem; text-align: left; }
+    th { background:#eee; }
+    button { padding: .4rem .8rem; border:none; border-radius:6px; cursor:pointer; }
+    .start { background:#0077ff; color:#fff; }
+    .stop { background:#ff5555; color:#fff; }
+    #status { margin-top:.5rem; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Panel de bots Kafka</h2>
+    <table>
+      <thead><tr><th>Bot</th><th>Descripción</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="status">Listo</div>
+  </div>
+
+  <script>
+    const bots = {
+      random: 'Aleatorio completo (por defecto rate 100)',
+      random50: 'Aleatorio completo (~50 msg/s)',
+      revista: 'Mujeres 10-16, estudiante (~250 msg/s)',
+      inserso: 'Jubilados 66+, género aleatorio (~500 msg/s)',
+      masculino: 'Hombres 25-40, profesión aleatoria (~200 msg/s)'
+    };
+
+    const rowsEl = document.getElementById('rows');
+    const statusEl = document.getElementById('status');
+
+    function renderStatus(data){
+      rowsEl.innerHTML = '';
+      Object.keys(bots).forEach(name => {
+        const tr = document.createElement('tr');
+        const tdName = document.createElement('td'); tdName.textContent = name; tr.appendChild(tdName);
+        const tdDesc = document.createElement('td'); tdDesc.textContent = bots[name]; tr.appendChild(tdDesc);
+        const tdState = document.createElement('td'); tdState.textContent = data && data[name] ? 'En ejecución' : 'Parado'; tr.appendChild(tdState);
+        const tdAct = document.createElement('td');
+        const bStart = document.createElement('button'); bStart.className='start'; bStart.textContent='Start'; bStart.onclick=()=>action('start', name);
+        const bStop = document.createElement('button'); bStop.className='stop'; bStop.style.marginLeft='6px'; bStop.textContent='Stop'; bStop.onclick=()=>action('stop', name);
+        tdAct.appendChild(bStart); tdAct.appendChild(bStop); tr.appendChild(tdAct);
+        rowsEl.appendChild(tr);
+      });
+    }
+
+    async function action(cmd, bot){
+      statusEl.textContent = `${cmd} ${bot}...`;
+      try {
+        const res = await fetch(`/${cmd}?bot=${bot}`, {method:'POST'});
+        if (!res.ok) throw new Error(await res.text());
+        await loadStatus();
+        statusEl.textContent = `${cmd} ${bot}: ok`;
+      } catch(err){
+        statusEl.textContent = `Error: ${err}`;
+      }
+    }
+
+    async function loadStatus(){
+      try {
+        const res = await fetch('/status');
+        if (!res.ok) throw new Error(await res.text());
+        const json = await res.json();
+        renderStatus(json);
+      } catch(err){
+        statusEl.textContent = `Error cargando estado: ${err}`;
+      }
+    }
+
+    renderStatus({});
+    loadStatus();
+    setInterval(loadStatus, 3000);
+  </script>
+</body>
+</html>
